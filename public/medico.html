@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel do Médico - Sistema de Chamada</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
+        .header { background: #007bff; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,123,255,0.2); }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .paciente-item { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #f0f2f5; transition: background 0.2s; }
+        .paciente-item:hover { background: #f8f9fa; }
+        .paciente-item:last-child { border-bottom: none; }
+        .btn-chamar { background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; transition: 0.3s; }
+        .btn-chamar:hover { background: #218838; transform: translateY(-2px); }
+        .sala-input { padding: 8px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.2); color: white; font-weight: bold; }
+        .sala-input::placeholder { color: #eee; }
+        .badge-esp { background: #e7f1ff; color: #007bff; font-weight: 600; padding: 5px 10px; border-radius: 6px; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h2 class="mb-0">Consultório Médico</h2>
+            <small id="statusConexao">Conectando ao servidor...</small>
+        </div>
+        <div>
+            <label class="me-2 fw-bold">Sua Sala/Nome: </label>
+            <input type="text" id="minhaSala" class="sala-input" placeholder="Ex: Consultório 02" value="Consultório 01">
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0 text-secondary">Pacientes Aguardando</h5>
+        </div>
+        <div id="listaPacientes" class="card-body p-0">
+            <div class="p-4 text-center">Carregando fila...</div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const listaDiv = document.getElementById('listaPacientes');
+        const statusEl = document.getElementById('statusConexao');
+
+        // Função para carregar pacientes do Banco de Dados
+        async function carregarFila() {
+            try {
+                const resposta = await fetch('/pacientes-espera');
+                
+                if (!resposta.ok) throw new Error(`Erro: ${resposta.status}`);
+                
+                const pacientes = await resposta.json();
+                
+                listaDiv.innerHTML = '';
+
+                if (pacientes.length === 0) {
+                    listaDiv.innerHTML = '<div class="p-5 text-center text-muted">Nenhum paciente na fila no momento.</div>';
+                    return;
+                }
+
+                pacientes.forEach(p => {
+                    const item = document.createElement('div');
+                    item.className = 'paciente-item';
+                    
+                    // Lógica de Prioridade
+                    const corPrioridade = p.prioridade ? 'text-danger' : 'text-primary';
+                    const labelPrioridade = p.prioridade ? '⚠️ PRIORITÁRIO' : 'NORMAL';
+
+                    item.innerHTML = `
+                        <div>
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="h4 mb-0 me-3 fw-bold">${p.senha}</span>
+                                <span class="badge-esp">${p.especialidade || 'Geral'}</span>
+                            </div>
+                            <div class="text-dark fw-bold h5 mb-0">${p.paciente_nome}</div>
+                            <small class="${corPrioridade} fw-bold">${labelPrioridade}</small>
+                        </div>
+                        <button class="btn-chamar" onclick="chamar(${p.id}, '${p.paciente_nome}', '${p.senha}', '${p.especialidade}')">
+                            CHAMAR AGORA
+                        </button>
+                    `;
+                    listaDiv.appendChild(item);
+                });
+            } catch (err) {
+                console.error('Erro ao carregar fila:', err);
+                listaDiv.innerHTML = '<div class="p-4 text-center text-danger">Falha ao carregar fila. Verifique o servidor.</div>';
+            }
+        }
+
+        // Função que envia o sinal para a TV
+        function chamar(id, nome, senha, especialidade) {
+            const sala = document.getElementById('minhaSala').value.trim();
+            
+            if (!sala) {
+                alert('Por favor, informe sua sala antes de chamar.');
+                return;
+            }
+            
+            // Envia para o Socket (TV e Servidor)
+            socket.emit('chamar_paciente', {
+                id: id,
+                nome: nome,
+                senha: senha,
+                sala: sala,
+                especialidade: especialidade
+            });
+
+            // Atualiza a lista local imediatamente
+            setTimeout(carregarFila, 500);
+        }
+
+        // Eventos do Socket para monitorar conexão
+        socket.on('connect', () => {
+            statusEl.innerText = "● Servidor Online";
+            statusEl.className = "text-white opacity-75";
+            carregarFila();
+        });
+
+        socket.on('disconnect', () => {
+            statusEl.innerText = "○ Servidor Offline";
+            statusEl.className = "text-warning";
+        });
+
+        // Atualiza a cada 10 segundos
+        setInterval(carregarFila, 10000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediCall - Selecionar Painel</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        .hub-container { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f0f4f8; padding: 20px; }
+        .hub-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px; width: 100%; max-width: 1100px; margin-top: 50px; }
+        .hub-card { 
+            background: white; padding: 50px 30px; border-radius: 24px; text-align: center; 
+            text-decoration: none; color: inherit; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid transparent; position: relative; overflow: hidden;
+        }
+        .hub-card:hover { transform: translateY(-15px); border-color: var(--primary); box-shadow: 0 30px 60px rgba(59, 130, 246, 0.15); }
+        .hub-icon { font-size: 3.5rem; margin-bottom: 20px; display: block; }
+        .hub-card h3 { font-size: 1.4rem; font-weight: 800; margin-bottom: 10px; }
+        .hub-card p { color: #64748b; font-size: 0.95rem; line-height: 1.4; }
+        .badge-acesso { position: absolute; top: 15px; right: 15px; background: #eef2ff; color: var(--primary); padding: 4px 12px; border-radius: 50px; font-size: 0.7rem; font-weight: 800; }
+        
+        @media (max-width: 850px) { .hub-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="hub-container">
+        <div class="logo">
+            <div class="logo-box">+</div>
+            <span>MediCall</span>
+        </div>
+        
+        <h1 style="margin-top: 30px; text-align: center; font-size: 2.5rem;">Escolha seu ambiente de trabalho</h1>
+        <p style="color: #64748b; font-size: 1.1rem;">Selecione uma das opções abaixo para ser redirecionado.</p>
+
+        <div class="hub-grid">
+            <a href="medico.html" class="hub-card">
+                <span class="badge-acesso">SALA MÉDICA</span>
+                <span class="hub-icon">👨‍⚕️</span>
+                <h3>Painel do Médico</h3>
+                <p>Chamar pacientes, gerenciar histórico e status do atendimento.</p>
+            </a>
+
+            <a href="painel.html" class="hub-card">
+                <span class="badge-acesso">RECEPÇÃO</span>
+                <span class="hub-icon">📺</span>
+                <h3>Monitor de Chamadas</h3>
+                <p>Tela visual e sonora para os pacientes na recepção.</p>
+            </a>
+
+            <a href="triagem.html" class="hub-card">
+                <span class="badge-acesso">TRIAGEM</span>
+                <span class="hub-icon">📋</span>
+                <h3>Entrada e Triagem</h3>
+                <p>Emissão de senhas, classificação de risco e recepção.</p>
+            </a>
+        </div>
+
+        <a href="login.html" style="margin-top: 50px; color: #94a3b8; text-decoration: none; font-weight: 600;">← Voltar para o login</a>
+    </div>
+</body>
+</html>

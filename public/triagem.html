@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Triagem - Gerar Senha</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #e9ecef; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center; width: 450px; }
+        h1 { color: #343a40; margin-bottom: 25px; font-weight: bold; }
+        
+        .btn { width: 100%; padding: 20px; margin: 10px 0; border: none; border-radius: 10px; font-size: 1.3rem; font-weight: bold; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        .btn:hover { opacity: 0.9; }
+        
+        .btn-normal { background: #007bff; color: white; }
+        .btn-prioridade { background: #dc3545; color: white; }
+        
+        .info { margin-top: 20px; font-size: 1.1rem; min-height: 1.5em; }
+        
+        input, select { 
+            width: 100%; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            border-radius: 8px; 
+            border: 2px solid #dee2e6; 
+            font-size: 1.1rem; 
+            box-sizing: border-box; 
+            outline: none;
+        }
+        input:focus, select:focus { border-color: #007bff; }
+        label { display: block; text-align: left; margin-bottom: 5px; color: #495057; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Triagem</h1>
+        
+        <label for="nomePaciente">Nome do Paciente</label>
+        <input type="text" id="nomePaciente" placeholder="Ex: João Silva">
+
+        <label for="especialidade">Especialidade Médica</label>
+        <select id="especialidade">
+            <option value="Clínico Geral">Clínico Geral</option>
+            <option value="Pediatria">Pediatria</option>
+            <option value="Ortopedia">Ortopedia</option>
+            <option value="Exames / Laboratório">Exames / Laboratório</option>
+        </select>
+        
+        <button class="btn btn-normal" onclick="gerarSenha(false)">ATENDIMENTO NORMAL</button>
+        <button class="btn btn-prioridade" onclick="gerarSenha(true)">PRIORITÁRIO</button>
+        
+        <div class="info" id="status">Selecione uma opção acima</div>
+    </div>
+
+    <script>
+        async function gerarSenha(isPrioridade) {
+            const nomeInput = document.getElementById('nomePaciente');
+            const espInput = document.getElementById('especialidade');
+            const statusMsg = document.getElementById('status');
+
+            const nome = nomeInput.value.trim() || "Paciente";
+            const especialidade = espInput.value;
+
+            statusMsg.innerHTML = "Processando...";
+
+            try {
+                const response = await fetch('/nova-senha', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        nome: nome, 
+                        prioridade: isPrioridade,
+                        especialidade: especialidade 
+                    })
+                });
+
+                if (!response.ok) throw new Error('Erro na resposta do servidor');
+
+                const data = await response.json();
+                
+                statusMsg.innerHTML = `<b style="color: green">Senha Gerada: ${data.senha}</b>`;
+                
+                // Limpa o campo nome para o próximo
+                nomeInput.value = "";
+
+                // Chama a impressão
+                imprimirTicket(data.senha, nome, especialidade);
+
+            } catch (error) {
+                console.error(error);
+                statusMsg.innerHTML = `<b style="color: red">Erro ao conectar com o servidor</b>`;
+            }
+        }
+
+        function imprimirTicket(senha, nome, especialidade) {
+            const dataHora = new Date().toLocaleString('pt-BR');
+            const janelaSimulada = window.open('', '_blank', 'width=300,height=400');
+            
+            janelaSimulada.document.write(`
+                <html>
+                <body style="text-align:center; font-family:Arial, sans-serif; padding: 20px;">
+                    <h2 style="margin-bottom:0;">CLÍNICA MÉDICA</h2>
+                    <p style="margin-top:5px; font-size: 12px;">Gestão de Atendimento</p>
+                    <hr>
+                    <p style="font-size: 14px; margin-bottom: 0;">SUA SENHA É:</p>
+                    <h1 style="font-size: 4rem; margin: 10px 0;">${senha}</h1>
+                    <p style="font-size: 18px; font-weight: bold; margin: 5px 0;">${nome}</p>
+                    <p style="background: #eee; padding: 5px;">${especialidade}</p>
+                    <hr>
+                    <p style="font-size: 12px;">${dataHora}</p>
+                </body>
+                </html>
+            `);
+            
+            janelaSimulada.print();
+            janelaSimulada.close();
+        }
+    </script>
+</body>
+</html>
