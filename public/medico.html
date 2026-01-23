@@ -6,30 +6,72 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { font-family: 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; padding: 20px; }
-        .header { background: #007bff; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,123,255,0.2); }
+        .header { background: #007bff; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,123,255,0.2); }
+        .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .header-controls { display: flex; gap: 15px; flex-wrap: wrap; }
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
         .paciente-item { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #f0f2f5; transition: background 0.2s; }
         .paciente-item:hover { background: #f8f9fa; }
         .paciente-item:last-child { border-bottom: none; }
         .btn-chamar { background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; transition: 0.3s; }
         .btn-chamar:hover { background: #218838; transform: translateY(-2px); }
-        .sala-input { padding: 8px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.2); color: white; font-weight: bold; }
-        .sala-input::placeholder { color: #eee; }
+        .select-input { padding: 8px 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.2); color: white; font-weight: bold; min-width: 200px; }
+        .select-input option { color: #000; }
+        .select-input::placeholder { color: #eee; }
         .badge-esp { background: #e7f1ff; color: #007bff; font-weight: 600; padding: 5px 10px; border-radius: 6px; font-size: 0.85rem; }
+        .filter-info { background: #e7f1ff; color: #007bff; padding: 10px 15px; border-radius: 8px; font-weight: 600; text-align: center; margin-bottom: 15px; }
+        
+        @media (max-width: 768px) {
+            .header-row { flex-direction: column; align-items: stretch; }
+            .header-controls { flex-direction: column; }
+            .select-input { width: 100%; }
+        }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <div>
-            <h2 class="mb-0">Consultório Médico</h2>
-            <small id="statusConexao">Conectando ao servidor...</small>
-        </div>
-        <div>
-            <label class="me-2 fw-bold">Sua Sala/Nome: </label>
-            <input type="text" id="minhaSala" class="sala-input" placeholder="Ex: Consultório 02" value="Consultório 01">
+        <div class="header-row">
+            <div>
+                <h2 class="mb-0">Consultório Médico</h2>
+                <small id="statusConexao">Conectando ao servidor...</small>
+            </div>
+            <div class="header-controls">
+                <div>
+                    <label class="fw-bold" style="font-size: 0.9rem;">Filtrar por Especialidade:</label>
+                    <select id="filtroEspecialidade" class="select-input" onchange="aplicarFiltro()">
+                        <option value="TODOS">📋 Todos os Pacientes</option>
+                        <option value="Clínico Geral">🩺 Clínico Geral</option>
+                        <option value="Pediatria">👶 Pediatria</option>
+                        <option value="Ortopedia">🦴 Ortopedia</option>
+                        <option value="Cardiologia">❤️ Cardiologia</option>
+                        <option value="Oftalmologia">👁️ Oftalmologia</option>
+                        <option value="Otorrinolaringologia">👂 Otorrinolaringologia</option>
+                        <option value="Ultrassom">📡 Ultrassom</option>
+                        <option value="Raio-X">📷 Raio-X</option>
+                        <option value="Exames / Laboratório">🔬 Exames / Laboratório</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="fw-bold" style="font-size: 0.9rem;">Consultório/Sala:</label>
+                    <select id="minhaSala" class="select-input">
+                        <option value="">Selecione o consultório</option>
+                        <option value="Consultório 1">Consultório 1</option>
+                        <option value="Consultório 2">Consultório 2</option>
+                        <option value="Consultório 3">Consultório 3</option>
+                        <option value="Consultório 4">Consultório 4</option>
+                        <option value="Consultório 5">Consultório 5</option>
+                        <option value="Sala de Exames 1">Sala de Exames 1</option>
+                        <option value="Sala de Exames 2">Sala de Exames 2</option>
+                        <option value="Ultrassom">Ultrassom</option>
+                        <option value="Raio-X">Raio-X</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div id="filtroAtivo" class="filter-info" style="display: none;"></div>
 
     <div class="card">
         <div class="card-header bg-white py-3">
@@ -45,6 +87,19 @@
         const socket = io();
         const listaDiv = document.getElementById('listaPacientes');
         const statusEl = document.getElementById('statusConexao');
+        const filtroInfo = document.getElementById('filtroAtivo');
+        let todosOsPacientes = [];
+
+        // Salva última sala selecionada
+        const ultimaSala = localStorage.getItem('ultimaSala');
+        if (ultimaSala) {
+            document.getElementById('minhaSala').value = ultimaSala;
+        }
+
+        // Salva quando trocar de sala
+        document.getElementById('minhaSala').addEventListener('change', (e) => {
+            localStorage.setItem('ultimaSala', e.target.value);
+        });
 
         // Função para carregar pacientes do Banco de Dados
         async function carregarFila() {
@@ -53,50 +108,78 @@
                 
                 if (!resposta.ok) throw new Error(`Erro: ${resposta.status}`);
                 
-                const pacientes = await resposta.json();
-                
-                listaDiv.innerHTML = '';
+                todosOsPacientes = await resposta.json();
+                aplicarFiltro();
 
-                if (pacientes.length === 0) {
-                    listaDiv.innerHTML = '<div class="p-5 text-center text-muted">Nenhum paciente na fila no momento.</div>';
-                    return;
-                }
-
-                pacientes.forEach(p => {
-                    const item = document.createElement('div');
-                    item.className = 'paciente-item';
-                    
-                    // Lógica de Prioridade
-                    const corPrioridade = p.prioridade ? 'text-danger' : 'text-primary';
-                    const labelPrioridade = p.prioridade ? '⚠️ PRIORITÁRIO' : 'NORMAL';
-
-                    item.innerHTML = `
-                        <div>
-                            <div class="d-flex align-items-center mb-1">
-                                <span class="h4 mb-0 me-3 fw-bold">${p.senha}</span>
-                                <span class="badge-esp">${p.especialidade || 'Geral'}</span>
-                            </div>
-                            <div class="text-dark fw-bold h5 mb-0">${p.paciente_nome}</div>
-                            <small class="${corPrioridade} fw-bold">${labelPrioridade}</small>
-                        </div>
-                        <button class="btn-chamar" onclick="chamar(${p.id}, '${p.paciente_nome}', '${p.senha}', '${p.especialidade}')">
-                            CHAMAR AGORA
-                        </button>
-                    `;
-                    listaDiv.appendChild(item);
-                });
             } catch (err) {
                 console.error('Erro ao carregar fila:', err);
-                listaDiv.innerHTML = '<div class="p-4 text-center text-danger">Falha ao carregar fila. Verifique o servidor.</div>';
+                listaDiv.innerHTML = '<div class="p-4 text-center text-danger">❌ Falha ao carregar fila. Verifique o servidor.</div>';
             }
+        }
+
+        // Função para aplicar filtro de especialidade
+        function aplicarFiltro() {
+            const filtro = document.getElementById('filtroEspecialidade').value;
+            
+            let pacientesFiltrados = todosOsPacientes;
+            
+            if (filtro !== 'TODOS') {
+                pacientesFiltrados = todosOsPacientes.filter(p => p.especialidade === filtro);
+                filtroInfo.style.display = 'block';
+                filtroInfo.innerHTML = `🔍 Mostrando apenas: <strong>${filtro}</strong> (${pacientesFiltrados.length} paciente${pacientesFiltrados.length !== 1 ? 's' : ''})`;
+            } else {
+                filtroInfo.style.display = 'none';
+            }
+            
+            exibirPacientes(pacientesFiltrados);
+        }
+
+        // Função para exibir pacientes
+        function exibirPacientes(pacientes) {
+            listaDiv.innerHTML = '';
+
+            if (pacientes.length === 0) {
+                const filtro = document.getElementById('filtroEspecialidade').value;
+                const mensagem = filtro === 'TODOS' ? 
+                    'Nenhum paciente na fila no momento.' : 
+                    `Nenhum paciente aguardando para ${filtro}.`;
+                listaDiv.innerHTML = `<div class="p-5 text-center text-muted">😴 ${mensagem}</div>`;
+                return;
+            }
+
+            pacientes.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'paciente-item';
+                
+                // Lógica de Prioridade
+                const corPrioridade = p.prioridade ? 'text-danger' : 'text-primary';
+                const labelPrioridade = p.prioridade ? '⚠️ PRIORITÁRIO' : '✓ NORMAL';
+
+                item.innerHTML = `
+                    <div>
+                        <div class="d-flex align-items-center mb-1">
+                            <span class="h4 mb-0 me-3 fw-bold">${p.senha}</span>
+                            <span class="badge-esp">${p.especialidade || 'Geral'}</span>
+                        </div>
+                        <div class="text-dark fw-bold h5 mb-0">${p.paciente_nome}</div>
+                        <small class="${corPrioridade} fw-bold">${labelPrioridade}</small>
+                    </div>
+                    <button class="btn-chamar" onclick="chamar(${p.id}, '${p.paciente_nome}', '${p.senha}', '${p.especialidade}')">
+                        📢 CHAMAR AGORA
+                    </button>
+                `;
+                listaDiv.appendChild(item);
+            });
         }
 
         // Função que envia o sinal para a TV
         function chamar(id, nome, senha, especialidade) {
-            const sala = document.getElementById('minhaSala').value.trim();
+            const salaSelect = document.getElementById('minhaSala');
+            const sala = salaSelect.value.trim();
             
             if (!sala) {
-                alert('Por favor, informe sua sala antes de chamar.');
+                alert('⚠️ Por favor, selecione o consultório/sala antes de chamar o paciente.');
+                salaSelect.focus();
                 return;
             }
             
@@ -109,8 +192,16 @@
                 especialidade: especialidade
             });
 
-            // Atualiza a lista local imediatamente
-            setTimeout(carregarFila, 500);
+            // Feedback visual
+            const btn = event.target;
+            btn.textContent = '✅ Chamado!';
+            btn.style.background = '#6c757d';
+            btn.disabled = true;
+
+            // Atualiza a lista após 500ms
+            setTimeout(() => {
+                carregarFila();
+            }, 500);
         }
 
         // Eventos do Socket para monitorar conexão

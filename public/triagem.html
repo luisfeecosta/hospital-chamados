@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <title>Triagem - Gerar Senha</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #e9ecef; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center; width: 450px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #e9ecef; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center; width: 100%; max-width: 450px; }
         h1 { color: #343a40; margin-bottom: 25px; font-weight: bold; }
         
         .btn { width: 100%; padding: 20px; margin: 10px 0; border: none; border-radius: 10px; font-size: 1.3rem; font-weight: bold; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
         .btn:active { transform: scale(0.98); }
         .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
         .btn-normal { background: #007bff; color: white; }
         .btn-prioridade { background: #dc3545; color: white; }
@@ -28,7 +29,56 @@
             outline: none;
         }
         input:focus, select:focus { border-color: #007bff; }
+        input.error, select.error { border-color: #dc3545; }
+        
         label { display: block; text-align: left; margin-bottom: 5px; color: #495057; font-weight: 600; }
+        label.required::after { content: " *"; color: #dc3545; }
+        
+        /* Toggle de impressão */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: #ccc;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background: #28a745;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        .toggle-switch.active .toggle-slider {
+            left: 33px;
+        }
+        
+        .toggle-label {
+            font-weight: 600;
+            color: #495057;
+        }
     </style>
 </head>
 <body>
@@ -36,33 +86,100 @@
     <div class="card">
         <h1>Triagem</h1>
         
-        <label for="nomePaciente">Nome do Paciente</label>
-        <input type="text" id="nomePaciente" placeholder="Ex: João Silva">
+        <label for="nomePaciente" class="required">Nome do Paciente</label>
+        <input type="text" id="nomePaciente" placeholder="Ex: João Silva" required>
 
-        <label for="especialidade">Especialidade Médica</label>
-        <select id="especialidade">
+        <label for="especialidade" class="required">Especialidade Médica</label>
+        <select id="especialidade" required>
+            <option value="">Selecione uma especialidade</option>
             <option value="Clínico Geral">Clínico Geral</option>
             <option value="Pediatria">Pediatria</option>
             <option value="Ortopedia">Ortopedia</option>
+            <option value="Cardiologia">Cardiologia</option>
+            <option value="Oftalmologia">Oftalmologia</option>
+            <option value="Otorrinolaringologia">Otorrinolaringologia</option>
+            <option value="Ultrassom">Ultrassom</option>
+            <option value="Raio-X">Raio-X</option>
             <option value="Exames / Laboratório">Exames / Laboratório</option>
         </select>
+        
+        <!-- Toggle de impressão -->
+        <div class="toggle-container">
+            <span class="toggle-label">Imprimir senha:</span>
+            <div class="toggle-switch active" id="toggleImpressao" onclick="toggleImpressao()">
+                <div class="toggle-slider"></div>
+            </div>
+            <span id="statusImpressao" style="font-weight: bold; color: #28a745;">LIGADO</span>
+        </div>
         
         <button class="btn btn-normal" onclick="gerarSenha(false)">ATENDIMENTO NORMAL</button>
         <button class="btn btn-prioridade" onclick="gerarSenha(true)">PRIORITÁRIO</button>
         
-        <div class="info" id="status">Selecione uma opção acima</div>
+        <div class="info" id="status">Preencha os campos obrigatórios (*)</div>
     </div>
 
     <script>
+        // Estado da impressão (salvo no localStorage)
+        let imprimirAtivo = localStorage.getItem('imprimirSenha') !== 'false';
+        
+        // Inicializa toggle
+        window.addEventListener('DOMContentLoaded', () => {
+            const toggle = document.getElementById('toggleImpressao');
+            const status = document.getElementById('statusImpressao');
+            
+            if (!imprimirAtivo) {
+                toggle.classList.remove('active');
+                status.textContent = 'DESLIGADO';
+                status.style.color = '#dc3545';
+            }
+        });
+        
+        function toggleImpressao() {
+            imprimirAtivo = !imprimirAtivo;
+            localStorage.setItem('imprimirSenha', imprimirAtivo);
+            
+            const toggle = document.getElementById('toggleImpressao');
+            const status = document.getElementById('statusImpressao');
+            
+            if (imprimirAtivo) {
+                toggle.classList.add('active');
+                status.textContent = 'LIGADO';
+                status.style.color = '#28a745';
+            } else {
+                toggle.classList.remove('active');
+                status.textContent = 'DESLIGADO';
+                status.style.color = '#dc3545';
+            }
+        }
+        
         async function gerarSenha(isPrioridade) {
             const nomeInput = document.getElementById('nomePaciente');
             const espInput = document.getElementById('especialidade');
             const statusMsg = document.getElementById('status');
 
-            const nome = nomeInput.value.trim() || "Paciente";
+            const nome = nomeInput.value.trim();
             const especialidade = espInput.value;
 
-            statusMsg.innerHTML = "Processando...";
+            // Validação
+            if (!nome) {
+                nomeInput.classList.add('error');
+                statusMsg.innerHTML = '<b style="color: red">❌ Nome é obrigatório!</b>';
+                nomeInput.focus();
+                return;
+            } else {
+                nomeInput.classList.remove('error');
+            }
+            
+            if (!especialidade) {
+                espInput.classList.add('error');
+                statusMsg.innerHTML = '<b style="color: red">❌ Especialidade é obrigatória!</b>';
+                espInput.focus();
+                return;
+            } else {
+                espInput.classList.remove('error');
+            }
+
+            statusMsg.innerHTML = "⏳ Processando...";
 
             try {
                 const response = await fetch('/nova-senha', {
@@ -79,42 +196,62 @@
 
                 const data = await response.json();
                 
-                statusMsg.innerHTML = `<b style="color: green">Senha Gerada: ${data.senha}</b>`;
+                statusMsg.innerHTML = `<b style="color: green">✅ Senha Gerada: ${data.senha}</b>`;
                 
-                // Limpa o campo nome para o próximo
+                // Limpa os campos
                 nomeInput.value = "";
-
-                // Chama a impressão
-                imprimirTicket(data.senha, nome, especialidade);
+                espInput.value = ""; // Volta para "Selecione"
+                
+                // Imprime se estiver ativo
+                if (imprimirAtivo) {
+                    imprimirTicket(data.senha, nome, especialidade, isPrioridade);
+                }
 
             } catch (error) {
                 console.error(error);
-                statusMsg.innerHTML = `<b style="color: red">Erro ao conectar com o servidor</b>`;
+                statusMsg.innerHTML = `<b style="color: red">❌ Erro ao conectar com o servidor</b>`;
             }
         }
 
-        function imprimirTicket(senha, nome, especialidade) {
+        function imprimirTicket(senha, nome, especialidade, isPrioridade) {
             const dataHora = new Date().toLocaleString('pt-BR');
-            const janelaSimulada = window.open('', '_blank', 'width=300,height=400');
+            const prioridadeTexto = isPrioridade ? 
+                '<p style="background: #dc3545; color: white; padding: 8px; font-weight: bold; border-radius: 5px;">⚠️ ATENDIMENTO PRIORITÁRIO</p>' : 
+                '<p style="background: #007bff; color: white; padding: 8px; font-weight: bold; border-radius: 5px;">ATENDIMENTO NORMAL</p>';
+            
+            const janelaSimulada = window.open('', '_blank', 'width=300,height=450');
             
             janelaSimulada.document.write(`
                 <html>
-                <body style="text-align:center; font-family:Arial, sans-serif; padding: 20px;">
-                    <h2 style="margin-bottom:0;">CLÍNICA MÉDICA</h2>
-                    <p style="margin-top:5px; font-size: 12px;">Gestão de Atendimento</p>
+                <head>
+                    <style>
+                        body { text-align: center; font-family: Arial, sans-serif; padding: 20px; }
+                        @media print {
+                            button { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h2 style="margin-bottom:0;">🏥 CLÍNICA MÉDICA</h2>
+                    <p style="margin-top:5px; font-size: 12px;">Sistema MediCall</p>
                     <hr>
+                    ${prioridadeTexto}
                     <p style="font-size: 14px; margin-bottom: 0;">SUA SENHA É:</p>
-                    <h1 style="font-size: 4rem; margin: 10px 0;">${senha}</h1>
+                    <h1 style="font-size: 4.5rem; margin: 10px 0; color: #007bff;">${senha}</h1>
                     <p style="font-size: 18px; font-weight: bold; margin: 5px 0;">${nome}</p>
-                    <p style="background: #eee; padding: 5px;">${especialidade}</p>
+                    <p style="background: #eee; padding: 8px; border-radius: 5px; font-weight: 600;">${especialidade}</p>
                     <hr>
-                    <p style="font-size: 12px;">${dataHora}</p>
+                    <p style="font-size: 12px; color: #666;">${dataHora}</p>
+                    <p style="font-size: 10px; color: #999; margin-top: 20px;">Aguarde ser chamado no painel</p>
+                    <button onclick="window.print()" style="margin-top: 15px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">🖨️ Imprimir</button>
                 </body>
                 </html>
             `);
             
-            janelaSimulada.print();
-            janelaSimulada.close();
+            // Auto-imprime após 500ms
+            setTimeout(() => {
+                janelaSimulada.print();
+            }, 500);
         }
     </script>
 </body>
