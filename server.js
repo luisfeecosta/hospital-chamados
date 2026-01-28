@@ -114,9 +114,33 @@ passport.deserializeUser(async (id, done) => {
 // MIDDLEWARE DE AUTENTICAÇÃO
 // ==========================================
 function isAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) {
+    // Verifica JWT no cookie primeiro
+    const token = req.cookies.auth_token;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-jwt-secret');
+            // Simula req.user para compatibilidade
+            req.user = { 
+                id: decoded.id, 
+                email: decoded.email, 
+                plano: decoded.plano 
+            };
+            return next();
+        } catch (err) {
+            console.log('❌ Token JWT inválido:', err.message);
+        }
+    }
+    
+    // Fallback para sessão Passport
+    if (req.isAuthenticated && req.isAuthenticated()) {
         return next();
     }
+    
+    // Se chegou aqui, não está autenticado
+    if (req.originalUrl.includes('/api/') || req.headers['content-type'] === 'application/json') {
+        return res.status(401).json({ error: 'Não autenticado' });
+    }
+    
     res.redirect('/login.html');
 }
 
@@ -178,7 +202,8 @@ app.get('/auth/google/callback',
             res.cookie('auth_token', token, { 
                 httpOnly: true, 
                 secure: process.env.NODE_ENV === 'production',
-                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
             });
 
             // Verifica se tinha plano desejado
@@ -221,8 +246,27 @@ app.get('/auth/logout', (req, res) => {
 
 // Verificar status de autenticação
 app.get('/auth/status', (req, res) => {
-    if (req.isAuthenticated()) {
-        res.json({
+    // Verifica JWT no cookie primeiro
+    const token = req.cookies.auth_token;
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-jwt-secret');
+            return res.json({
+                autenticado: true,
+                usuario: {
+                    id: decoded.id,
+                    email: decoded.email,
+                    plano: decoded.plano
+                }
+            });
+        } catch (err) {
+            console.log('❌ Token JWT inválido no status:', err.message);
+        }
+    }
+    
+    // Fallback para sessão Passport
+    if (req.isAuthenticated && req.isAuthenticated()) {
+        return res.json({
             autenticado: true,
             usuario: {
                 id: req.user.id,
@@ -233,9 +277,9 @@ app.get('/auth/status', (req, res) => {
                 status: req.user.status
             }
         });
-    } else {
-        res.json({ autenticado: false });
     }
+    
+    res.json({ autenticado: false });
 });
 
 // ==========================================
