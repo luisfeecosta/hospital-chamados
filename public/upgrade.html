@@ -400,25 +400,11 @@
         document.getElementById('btnUpgrade').addEventListener('click', async function() {
             const btn = this;
             btn.disabled = true;
-            btn.textContent = '⏳ Processando...';
+            btn.textContent = '⏳ Redirecionando...';
 
             try {
-                // Chama API para criar checkout
-                const response = await fetch('/api/checkout/kiwify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ plano: 'profissional' })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Erro ao criar checkout');
-                }
-
-                const data = await response.json();
-                
-                // Redireciona para checkout da Kiwify
-                window.location.href = data.checkout_url;
+                // Redireciona diretamente para o checkout da Kiwify
+                window.location.href = 'https://pay.kiwify.com.br/6Xr4jLG';
 
             } catch (error) {
                 console.error('Erro:', error);
