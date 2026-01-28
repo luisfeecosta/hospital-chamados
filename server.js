@@ -439,6 +439,8 @@ app.post('/api/checkout/pagbank', isAuthenticated, async (req, res) => {
 // Nova senha (limitado por plano)
 app.post('/nova-senha', isAuthenticated, async (req, res) => {
     try {
+        console.log('📝 Nova senha - Usuário:', req.user?.email || 'Não identificado');
+        
         const { nome, prioridade, especialidade } = req.body;
         const user = req.user;
 
@@ -474,8 +476,8 @@ app.post('/nova-senha', isAuthenticated, async (req, res) => {
         res.json(result.rows[0]);
 
     } catch (err) {
-        console.error('❌ Erro:', err);
-        res.status(500).json({ error: 'Erro no servidor' });
+        console.error('❌ Erro ao gerar senha:', err);
+        res.status(500).json({ error: 'Erro no servidor: ' + err.message });
     }
 });
 
