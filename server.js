@@ -164,33 +164,49 @@ app.get('/auth/google', (req, res, next) => {
 app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login.html?error=true' }),
     (req, res) => {
-        // Cria token JWT
-        const token = jwt.sign(
-            { id: req.user.id, email: req.user.email, plano: req.user.plano },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
+        console.log('✅ Callback executado para usuário:', req.user?.email);
+        
+        try {
+            // Cria token JWT
+            const token = jwt.sign(
+                { id: req.user.id, email: req.user.email, plano: req.user.plano },
+                process.env.JWT_SECRET || 'fallback-jwt-secret',
+                { expiresIn: '7d' }
+            );
 
-        // Salva token em cookie
-        res.cookie('auth_token', token, { 
-            httpOnly: true, 
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
-        });
+            // Salva token em cookie
+            res.cookie('auth_token', token, { 
+                httpOnly: true, 
+                secure: process.env.NODE_ENV === 'production',
+                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
+            });
 
-        // Verifica se tinha plano desejado
-        const planoDesejado = req.session.planoDesejado;
-        delete req.session.planoDesejado;
+            // Verifica se tinha plano desejado
+            const planoDesejado = req.session.planoDesejado;
+            delete req.session.planoDesejado;
 
-        if (planoDesejado === 'profissional') {
-            // Queria plano profissional → vai para upgrade
-            res.redirect('/upgrade.html');
-        } else if (req.user.plano === 'gratuito') {
-            // Novo usuário gratuito → vai para seleção
-            res.redirect('/selecao.html?plano=gratuito&novo=true');
-        } else {
-            // Usuário existente → vai para seleção
-            res.redirect('/selecao.html');
+            console.log('🔄 Redirecionando usuário:', {
+                email: req.user.email,
+                plano: req.user.plano,
+                planoDesejado
+            });
+
+            if (planoDesejado === 'profissional') {
+                // Queria plano profissional → vai para upgrade
+                console.log('→ Redirecionando para upgrade');
+                return res.redirect('/upgrade.html');
+            } else if (req.user.plano === 'gratuito') {
+                // Novo usuário gratuito → vai para seleção
+                console.log('→ Redirecionando para seleção (novo usuário)');
+                return res.redirect('/selecao.html?plano=gratuito&novo=true');
+            } else {
+                // Usuário existente → vai para seleção
+                console.log('→ Redirecionando para seleção (usuário existente)');
+                return res.redirect('/selecao.html');
+            }
+        } catch (error) {
+            console.error('❌ Erro no callback:', error);
+            return res.redirect('/login.html?error=callback');
         }
     }
 );
