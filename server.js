@@ -113,19 +113,19 @@ passport.deserializeUser(async (id, done) => {
 // ==========================================
 // MIDDLEWARE DE AUTENTICAÇÃO
 // ==========================================
-function isAuthenticated(req, res, next) {
+async function isAuthenticated(req, res, next) {
     // Verifica JWT no cookie primeiro
     const token = req.cookies.auth_token;
     if (token) {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-jwt-secret');
-            // Simula req.user para compatibilidade
-            req.user = { 
-                id: decoded.id, 
-                email: decoded.email, 
-                plano: decoded.plano 
-            };
-            return next();
+            
+            // Busca dados completos do usuário no banco
+            const result = await pool.query('SELECT * FROM usuarios WHERE id = $1', [decoded.id]);
+            if (result.rows.length > 0) {
+                req.user = result.rows[0];
+                return next();
+            }
         } catch (err) {
             console.log('❌ Token JWT inválido:', err.message);
         }
@@ -245,20 +245,29 @@ app.get('/auth/logout', (req, res) => {
 });
 
 // Verificar status de autenticação
-app.get('/auth/status', (req, res) => {
+app.get('/auth/status', async (req, res) => {
     // Verifica JWT no cookie primeiro
     const token = req.cookies.auth_token;
     if (token) {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-jwt-secret');
-            return res.json({
-                autenticado: true,
-                usuario: {
-                    id: decoded.id,
-                    email: decoded.email,
-                    plano: decoded.plano
-                }
-            });
+            
+            // Busca dados completos do usuário
+            const result = await pool.query('SELECT * FROM usuarios WHERE id = $1', [decoded.id]);
+            if (result.rows.length > 0) {
+                const user = result.rows[0];
+                return res.json({
+                    autenticado: true,
+                    usuario: {
+                        id: user.id,
+                        nome: user.nome,
+                        email: user.email,
+                        foto: user.foto_url,
+                        plano: user.plano,
+                        status: user.status
+                    }
+                });
+            }
         } catch (err) {
             console.log('❌ Token JWT inválido no status:', err.message);
         }
