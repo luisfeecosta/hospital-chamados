@@ -37,7 +37,12 @@ pool.connect((err, client, release) => {
 // ==========================================
 // MIDDLEWARES
 // ==========================================
-app.use(cors({ origin: process.env.BASE_URL, credentials: true }));
+app.use(cors({ 
+    origin: process.env.NODE_ENV === 'production' 
+        ? 'https://hospital-chamados.onrender.com' 
+        : 'http://localhost:3000', 
+    credentials: true 
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -45,7 +50,7 @@ app.use(express.static('public'));
 
 // Sessão
 app.use(session({
-    secret: process.env.SESSION_SECRET,
+    secret: process.env.SESSION_SECRET || 'fallback-secret-key',
     resave: false,
     saveUninitialized: false,
     cookie: { 
