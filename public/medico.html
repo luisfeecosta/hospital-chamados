@@ -104,7 +104,14 @@
         // Função para carregar pacientes do Banco de Dados
         async function carregarFila() {
             try {
-                const resposta = await fetch('/pacientes-espera');
+                const resposta = await fetch('/pacientes-espera', {
+                    credentials: 'include'
+                });
+                
+                if (resposta.status === 401) {
+                    window.location.href = '/login.html';
+                    return;
+                }
                 
                 if (!resposta.ok) throw new Error(`Erro: ${resposta.status}`);
                 

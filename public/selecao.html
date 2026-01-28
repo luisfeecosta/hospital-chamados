@@ -121,27 +121,81 @@
     </div>
 
     <script>
+        let usuario = null;
+
+        // Carregar status do usuário
+        fetch('/auth/status')
+            .then(res => res.json())
+            .then(data => {
+                if (!data.autenticado) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                usuario = data.usuario;
+                
+                // Mostra alerta se for novo usuário gratuito
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('novo') === 'true' && usuario.plano === 'gratuito') {
+                    const alerta = document.createElement('div');
+                    alerta.style.cssText = 'background: #dbeafe; border-left: 4px solid #3b82f6; padding: 16px; border-radius: 8px; margin-bottom: 30px; text-align: center;';
+                    alerta.innerHTML = `
+                        <p style="margin: 0; color: #1e40af; font-weight: 600;">
+                            🎉 Bem-vindo ao <strong>Plano Gratuito</strong>! Você tem <strong>10 senhas por dia</strong>.<br>
+                            <a href="/upgrade.html" style="color: #3b82f6; text-decoration: underline;">Fazer upgrade para ilimitado</a>
+                        </p>
+                    `;
+                    document.querySelector('.hub-container').insertBefore(alerta, document.querySelector('h1'));
+                }
+
+                // Bloqueia download Excel se for gratuito
+                if (usuario.plano === 'gratuito') {
+                    const btnDownload = document.querySelector('.btn-download');
+                    btnDownload.disabled = true;
+                    btnDownload.style.opacity = '0.5';
+                    btnDownload.style.cursor = 'not-allowed';
+                    btnDownload.innerHTML = '<span>🔒</span><span>Excel (Plano Profissional)</span>';
+                    btnDownload.onclick = function(e) {
+                        e.preventDefault();
+                        if (confirm('📊 Download de Excel está disponível apenas no Plano Profissional.\n\nDeseja fazer upgrade agora?')) {
+                            window.location.href = '/upgrade.html?limite=true';
+                        }
+                    };
+                }
+            })
+            .catch(err => {
+                console.error('Erro:', err);
+                window.location.href = '/login.html';
+            });
+
         async function baixarExcel() {
+            if (!usuario || usuario.plano === 'gratuito') {
+                if (confirm('📊 Download de Excel disponível apenas no Plano Profissional.\n\nFazer upgrade?')) {
+                    window.location.href = '/upgrade.html?limite=true';
+                }
+                return;
+            }
+
             const btn = event.target.closest('button');
             const textoOriginal = btn.innerHTML;
             
             try {
-                // Feedback visual
                 btn.innerHTML = '<span>⏳</span><span>Gerando arquivo...</span>';
                 btn.disabled = true;
                 btn.style.opacity = '0.7';
                 
-                // Faz download do arquivo
-                const response = await fetch('/relatorio/download');
+                const response = await fetch('/relatorio/download', {
+                    credentials: 'include'
+                });
                 
                 if (!response.ok) {
+                    if (response.status === 403) {
+                        throw new Error('Plano insuficiente');
+                    }
                     throw new Error('Erro ao gerar relatório');
                 }
                 
-                // Pega o blob do arquivo
                 const blob = await response.blob();
-                
-                // Cria link de download
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -151,7 +205,6 @@
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
                 
-                // Feedback de sucesso
                 btn.innerHTML = '<span>✅</span><span>Download Concluído!</span>';
                 btn.style.background = '#059669';
                 
@@ -164,8 +217,14 @@
                 
             } catch (error) {
                 console.error('Erro:', error);
-                btn.innerHTML = '<span>❌</span><span>Erro no download</span>';
-                btn.style.background = '#ef4444';
+                if (error.message === 'Plano insuficiente') {
+                    if (confirm('📊 Upgrade necessário para baixar Excel.\n\nIr para upgrade?')) {
+                        window.location.href = '/upgrade.html?limite=true';
+                    }
+                } else {
+                    btn.innerHTML = '<span>❌</span><span>Erro no download</span>';
+                    btn.style.background = '#ef4444';
+                }
                 
                 setTimeout(() => {
                     btn.innerHTML = textoOriginal;

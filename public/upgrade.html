@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fazer Upgrade - MediCall</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --success: #10b981;
+            --slate-900: #0f172a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        body { background: #f8fafc; padding: 20px; }
+        
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.5rem; color: var(--primary); }
+        .logo-box { background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        
+        .user-info { display: flex; align-items: center; gap: 12px; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; }
+        .user-name { font-weight: 600; color: var(--slate-900); }
+        
+        .plan-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        
+        .plan-gratuito { background: #e0e7ff; color: #4338ca; }
+        .plan-profissional { background: #dcfce7; color: #16a34a; }
+        
+        .hero {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            color: var(--slate-900);
+            margin-bottom: 16px;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            color: #64748b;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+        
+        .plan-card {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            position: relative;
+        }
+        
+        .plan-card.featured {
+            border: 2px solid var(--primary);
+            transform: scale(1.05);
+        }
+        
+        .plan-tag {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+        
+        .plan-card h2 {
+            font-size: 1.8rem;
+            margin-bottom: 16px;
+            color: var(--slate-900);
+        }
+        
+        .plan-price {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+        
+        .plan-price span {
+            font-size: 1rem;
+            color: #64748b;
+        }
+        
+        .plan-features {
+            list-style: none;
+            margin: 30px 0;
+        }
+        
+        .plan-features li {
+            padding: 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1rem;
+            color: #475569;
+        }
+        
+        .plan-features li::before {
+            content: "✓";
+            color: var(--success);
+            font-weight: bold;
+            font-size: 1.3rem;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: none;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #e2e8f0;
+            color: var(--slate-900);
+        }
+        
+        .btn-outline:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .comparison {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            margin-bottom: 40px;
+        }
+        
+        .comparison h3 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 30px;
+            color: var(--slate-900);
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            padding: 16px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .comparison-table th {
+            font-weight: 700;
+            color: var(--slate-900);
+        }
+        
+        .comparison-table .check {
+            text-align: center;
+            font-size: 1.5rem;
+        }
+        
+        .comparison-table .check.yes { color: var(--success); }
+        .comparison-table .check.no { color: #dc2626; }
+        
+        .alert {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        
+        .alert p {
+            color: #92400e;
+            margin: 0;
+        }
+        
+        .back-link {
+            text-align: center;
+            margin-top: 40px;
+        }
+        
+        .back-link a {
+            color: #64748b;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        @media (max-width: 768px) {
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .plan-card.featured {
+                transform: none;
+            }
+            
+            .hero h1 {
+                font-size: 2rem;
+            }
+            
+            .comparison-table {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <div class="logo-box">+</div>
+                <span>MediCall</span>
+            </div>
+            <div class="user-info">
+                <img id="userAvatar" class="user-avatar" src="" alt="User">
+                <div>
+                    <div class="user-name" id="userName">Carregando...</div>
+                    <span class="plan-badge" id="userPlan">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="hero">
+            <h1>Desbloqueie Todo o Potencial</h1>
+            <p>Escolha o plano ideal para o seu crescimento</p>
+        </div>
+
+        <div id="limitAlert" class="alert" style="display: none;">
+            <p><strong>⚠️ Limite Atingido!</strong> Você atingiu o limite do plano gratuito. Faça upgrade para continuar usando.</p>
+        </div>
+
+        <div class="pricing-grid">
+            <!-- Plano Gratuito (atual) -->
+            <div class="plan-card">
+                <h2>Gratuito</h2>
+                <div class="plan-price">R$ 0<span>/mês</span></div>
+                <ul class="plan-features">
+                    <li>10 senhas por dia</li>
+                    <li>1 tela de chamada</li>
+                    <li>Relatórios básicos</li>
+                    <li>Suporte por email</li>
+                </ul>
+                <button class="btn btn-outline" disabled>Plano Atual</button>
+            </div>
+
+            <!-- Plano Profissional -->
+            <div class="plan-card featured">
+                <div class="plan-tag">MAIS POPULAR</div>
+                <h2>Profissional</h2>
+                <div class="plan-price">R$ 99,90<span>/mês</span></div>
+                <ul class="plan-features">
+                    <li>Senhas ilimitadas</li>
+                    <li>3 telas de chamada</li>
+                    <li>Relatórios avançados + Excel</li>
+                    <li>Personalização completa</li>
+                    <li>Suporte prioritário WhatsApp</li>
+                </ul>
+                <button class="btn btn-primary" id="btnUpgrade">Fazer Upgrade Agora</button>
+            </div>
+        </div>
+
+        <div class="comparison">
+            <h3>Comparação Completa</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Recurso</th>
+                        <th>Gratuito</th>
+                        <th>Profissional</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Senhas por dia</td>
+                        <td class="check">10</td>
+                        <td class="check">Ilimitado</td>
+                    </tr>
+                    <tr>
+                        <td>Telas de chamada</td>
+                        <td class="check">1</td>
+                        <td class="check">3</td>
+                    </tr>
+                    <tr>
+                        <td>Download Excel</td>
+                        <td class="check no">✗</td>
+                        <td class="check yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Personalização</td>
+                        <td class="check no">✗</td>
+                        <td class="check yes">✓</td>
+                    </tr>
+                    <tr>
+                        <td>Suporte</td>
+                        <td class="check">Email</td>
+                        <td class="check">WhatsApp Prioritário</td>
+                    </tr>
+                    <tr>
+                        <td>Histórico</td>
+                        <td class="check">7 dias</td>
+                        <td class="check">Ilimitado</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="back-link">
+            <a href="/selecao.html">← Voltar ao painel</a>
+        </div>
+    </div>
+
+    <script>
+        // Carregar informações do usuário
+        fetch('/auth/status')
+            .then(res => res.json())
+            .then(data => {
+                if (!data.autenticado) {
+                    window.location.href = '/login.html?upgrade=true';
+                    return;
+                }
+
+                const user = data.usuario;
+                document.getElementById('userName').textContent = user.nome;
+                document.getElementById('userAvatar').src = user.foto || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.nome);
+                
+                const planBadge = document.getElementById('userPlan');
+                planBadge.textContent = user.plano;
+                planBadge.className = 'plan-badge plan-' + user.plano;
+
+                // Se já for profissional, mostra mensagem
+                if (user.plano === 'profissional') {
+                    document.getElementById('btnUpgrade').textContent = 'Você já tem este plano!';
+                    document.getElementById('btnUpgrade').disabled = true;
+                }
+            })
+            .catch(err => {
+                console.error('Erro:', err);
+                window.location.href = '/login.html';
+            });
+
+        // Verificar se tem parâmetro de limite
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('limite') === 'true') {
+            document.getElementById('limitAlert').style.display = 'block';
+        }
+
+        // Botão de upgrade
+        document.getElementById('btnUpgrade').addEventListener('click', async function() {
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = '⏳ Processando...';
+
+            try {
+                // Chama API para criar checkout
+                const response = await fetch('/api/checkout/kiwify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ plano: 'profissional' })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erro ao criar checkout');
+                }
+
+                const data = await response.json();
+                
+                // Redireciona para checkout da Kiwify
+                window.location.href = data.checkout_url;
+
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao processar pagamento. Tente novamente.');
+                btn.disabled = false;
+                btn.textContent = 'Fazer Upgrade Agora';
+            }
+        });
+    </script>
+</body>
+</html>

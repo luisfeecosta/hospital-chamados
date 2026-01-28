@@ -134,12 +134,12 @@
                         <h3>Básico</h3>
                         <div class="p-price">Gratuito</div>
                         <ul class="p-list">
-                            <li>1 Recepcionista / 1 Médico</li>
+                            <li>10 senhas por dia</li>
                             <li>1 Tela de Chamada</li>
-                            <li>Chamada por Nome</li>
+                            <li>Relatórios básicos</li>
                             <li>Suporte via E-mail</li>
                         </ul>
-                        <a href="login.html" class="btn-outline" style="text-decoration: none; display: block; text-align: center; padding: 14px 28px;">Começar Grátis</a>
+                        <button class="btn-outline" onclick="handlePlanoClick('gratuito')">Começar Grátis</button>
                     </div>
                     
                     <!-- Plano Profissional -->
@@ -148,13 +148,13 @@
                         <h3>Profissional</h3>
                         <div class="p-price">R$ 99,90<span>/mês</span></div>
                         <ul class="p-list">
-                            <li>3 Recepcionistas / 5 Médicos</li>
+                            <li>Senhas ilimitadas</li>
                             <li>3 Telas de Chamada</li>
-                            <li>Chamada por Nome e Senha</li>
+                            <li>Download Excel</li>
                             <li>Personalização Completa</li>
                             <li>Suporte via WhatsApp</li>
                         </ul>
-                        <button class="btn-primary" onclick="irParaPagamento()">Começar Agora</button>
+                        <button class="btn-primary" onclick="handlePlanoClick('profissional')">Assinar Agora</button>
                     </div>
                     
                     <!-- Plano Enterprise -->
@@ -222,24 +222,47 @@
     </footer>
 
     <script>
-        // Gateway de pagamento (Plano Profissional)
-        function irParaPagamento() {
-            // SUBSTITUA pela sua URL do Mercado Pago/Stripe
-            alert('🔄 Redirecionando para pagamento...\n\nEm produção, aqui você integraria:\n- Mercado Pago\n- Stripe\n- Outro gateway');
-            
-            // Exemplo com Mercado Pago:
-            // window.location.href = 'https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=SEU_ID_AQUI';
-            
-            // Por enquanto, redireciona para login
-            setTimeout(() => {
-                window.location.href = 'login.html?plan=professional';
-            }, 2000);
+        // Função para lidar com cliques nos planos
+        async function handlePlanoClick(plano) {
+            const btn = event.target;
+            const textoOriginal = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Verificando...';
+
+            try {
+                // Verifica se usuário está autenticado
+                const response = await fetch('/auth/status');
+                const data = await response.json();
+
+                if (plano === 'gratuito') {
+                    // Plano gratuito sempre vai para login/cadastro
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                if (plano === 'profissional') {
+                    if (data.autenticado) {
+                        // Está logado → Vai direto para upgrade
+                        window.location.href = '/upgrade.html';
+                    } else {
+                        // Não está logado → Vai para login COM parâmetro
+                        window.location.href = '/login.html?plano=profissional';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Erro:', error);
+                // Em caso de erro, vai para login
+                window.location.href = '/login.html';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
+            }
         }
 
         // WhatsApp (Plano Enterprise)
         function irParaWhatsApp() {
-            // SUBSTITUA pelo seu número de WhatsApp (formato: 5511999999999)
-            const numeroWhatsApp = '5562999999999'; // Exemplo
+            const numeroWhatsApp = '5562999999999'; // COLOQUE SEU NÚMERO AQUI
             const mensagem = encodeURIComponent('Olá! Gostaria de conhecer o plano Enterprise do MediCall.');
             window.open(`https://wa.me/${numeroWhatsApp}?text=${mensagem}`, '_blank');
         }
