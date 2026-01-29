@@ -119,6 +119,35 @@
     </div>
 
     <script>
+        // Verifica autenticação ao carregar a página
+        async function verificarAuth() {
+            try {
+                const response = await fetch('/auth/status', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok || response.status === 401) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                
+                const data = await response.json();
+                if (!data.autenticado) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Erro ao verificar autenticação:', error);
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+        
+        // Verifica autenticação ao carregar
+        window.addEventListener('DOMContentLoaded', verificarAuth);
+        
         // Estado da impressão (salvo no localStorage)
         let imprimirAtivo = localStorage.getItem('imprimirSenha') !== 'false';
         
@@ -194,6 +223,8 @@
                 });
 
                 if (response.status === 401) {
+                    // Token expirado ou inválido - redireciona para login
+                    console.log('Token inválido, redirecionando para login');
                     window.location.href = '/login.html';
                     return;
                 }

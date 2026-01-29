@@ -35,6 +35,10 @@
             <div>
                 <h2 class="mb-0">Consultório Médico</h2>
                 <small id="statusConexao">Conectando ao servidor...</small>
+                <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 5px;">
+                    👤 User ID: <span id="debugUserId">-</span> | 
+                    📧 <span id="debugEmail">-</span>
+                </div>
             </div>
             <div class="header-controls">
                 <div>
@@ -84,6 +88,38 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // Verifica autenticação ao carregar a página
+        async function verificarAuth() {
+            try {
+                const response = await fetch('/auth/status', {
+                    credentials: 'include'
+                });
+                
+                if (!response.ok || response.status === 401) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                
+                const data = await response.json();
+                if (!data.autenticado) {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                
+                // Atualiza info de debug
+                document.getElementById('debugUserId').textContent = data.usuario.id;
+                document.getElementById('debugEmail').textContent = data.usuario.email;
+                
+                console.log('✅ [MÉDICO] Autenticado:', data.usuario.email, 'ID:', data.usuario.id);
+                
+                return true;
+            } catch (error) {
+                console.error('Erro ao verificar autenticação:', error);
+                window.location.href = '/login.html';
+                return false;
+            }
+        }
+        
         const socket = io();
         const listaDiv = document.getElementById('listaPacientes');
         const statusEl = document.getElementById('statusConexao');
@@ -103,12 +139,20 @@
 
         // Função para carregar pacientes do Banco de Dados
         async function carregarFila() {
+            // Verifica autenticação antes de carregar
+            const authOk = await verificarAuth();
+            if (!authOk) return;
+            
             try {
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                console.log('📋 [MÉDICO] Carregando fila...');
+                
                 const resposta = await fetch('/pacientes-espera', {
                     credentials: 'include'
                 });
                 
                 if (resposta.status === 401) {
+                    console.log('Token inválido, redirecionando para login');
                     window.location.href = '/login.html';
                     return;
                 }
@@ -116,6 +160,14 @@
                 if (!resposta.ok) throw new Error(`Erro: ${resposta.status}`);
                 
                 todosOsPacientes = await resposta.json();
+                
+                console.log('📋 [MÉDICO] Pacientes recebidos:', todosOsPacientes.length);
+                if (todosOsPacientes.length > 0) {
+                    console.log('📋 [MÉDICO] IDs:', todosOsPacientes.map(p => `${p.id} (${p.paciente_nome})`));
+                    console.log('📋 [MÉDICO] Usuario_ids:', todosOsPacientes.map(p => p.usuario_id));
+                }
+                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                
                 aplicarFiltro();
 
             } catch (err) {
@@ -190,14 +242,22 @@
                 return;
             }
             
-            // Envia para o Socket (TV e Servidor)
-            socket.emit('chamar_paciente', {
+            const dadosChamada = {
                 id: id,
                 nome: nome,
                 senha: senha,
                 sala: sala,
                 especialidade: especialidade
-            });
+            };
+            
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('📤 [MÉDICO] Emitindo chamada');
+            console.log('📤 [MÉDICO] Dados:', dadosChamada);
+            console.log('📤 [MÉDICO] Socket ID:', socket.id);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            // Envia para o Socket (TV e Servidor)
+            socket.emit('chamar_paciente', dadosChamada);
 
             // Feedback visual
             const btn = event.target;
@@ -212,10 +272,41 @@
         }
 
         // Eventos do Socket para monitorar conexão
-        socket.on('connect', () => {
+        socket.on('connect', async () => {
+            console.log('✅ [MÉDICO] Socket conectado:', socket.id);
+            
             statusEl.innerText = "● Servidor Online";
             statusEl.className = "text-white opacity-75";
-            carregarFila();
+            
+            // OBRIGATÓRIO: Entra na sala do usuário
+            try {
+                const response = await fetch('/auth/status', { credentials: 'include' });
+                const userData = await response.json();
+                if (userData.autenticado) {
+                    const dadosJoin = {
+                        contexto_id: userData.usuario.id,
+                        tipo: 'medico',
+                        email: userData.usuario.email
+                    };
+                    
+                    console.log('📤 [MÉDICO] Enviando join_room:', dadosJoin);
+                    socket.emit('join_room', dadosJoin);
+                }
+            } catch (error) {
+                console.error('❌ [MÉDICO] Erro ao obter dados do usuário:', error);
+            }
+            
+            // Verifica autenticação e carrega fila
+            const authOk = await verificarAuth();
+            if (authOk) {
+                carregarFila();
+            }
+        });
+        
+        // Confirmação de entrada na sala
+        socket.on('room_joined', (dados) => {
+            console.log('✅ [MÉDICO] Entrou na sala:', dados.roomId);
+            console.log('✅ [MÉDICO] Contexto confirmado:', dados.contexto_id);
         });
 
         socket.on('disconnect', () => {

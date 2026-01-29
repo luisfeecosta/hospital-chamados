@@ -37,12 +37,7 @@ pool.connect((err, client, release) => {
 // ==========================================
 // MIDDLEWARES
 // ==========================================
-app.use(cors({ 
-    origin: process.env.NODE_ENV === 'production' 
-        ? 'https://hospital-chamados.onrender.com' 
-        : 'http://localhost:3000', 
-    credentials: true 
-}));
+app.use(cors({ origin: process.env.BASE_URL || 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -50,12 +45,12 @@ app.use(express.static('public'));
 
 // Sessão
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'fallback-secret-key',
+    secret: process.env.SESSION_SECRET || 'secret-padrao-mude-isso',
     resave: false,
     saveUninitialized: false,
     cookie: { 
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000 // 24 horas
+        maxAge: 24 * 60 * 60 * 1000
     }
 }));
 
@@ -77,11 +72,9 @@ passport.use(new GoogleStrategy({
         const nome = profile.displayName;
         const foto = profile.photos[0]?.value;
 
-        // Verifica se usuário já existe
         let result = await pool.query('SELECT * FROM usuarios WHERE google_id = $1', [googleId]);
         
         if (result.rows.length === 0) {
-            // Cria novo usuário com plano gratuito
             result = await pool.query(
                 'INSERT INTO usuarios (google_id, email, nome, foto_url, plano, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
                 [googleId, email, nome, foto, 'gratuito', 'ativo']
@@ -113,35 +106,11 @@ passport.deserializeUser(async (id, done) => {
 // ==========================================
 // MIDDLEWARE DE AUTENTICAÇÃO
 // ==========================================
-async function isAuthenticated(req, res, next) {
-    // Verifica JWT no cookie primeiro
-    const token = req.cookies.auth_token;
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-jwt-secret');
-            
-            // Busca dados completos do usuário no banco
-            const result = await pool.query('SELECT * FROM usuarios WHERE id = $1', [decoded.id]);
-            if (result.rows.length > 0) {
-                req.user = result.rows[0];
-                return next();
-            }
-        } catch (err) {
-            console.log('❌ Token JWT inválido:', err.message);
-        }
-    }
-    
-    // Fallback para sessão Passport
-    if (req.isAuthenticated && req.isAuthenticated()) {
+function isAuthenticated(req, res, next) {
+    if (req.isAuthenticated()) {
         return next();
     }
-    
-    // Se chegou aqui, não está autenticado
-    if (req.originalUrl.includes('/api/') || req.headers['content-type'] === 'application/json') {
-        return res.status(401).json({ error: 'Não autenticado' });
-    }
-    
-    res.redirect('/login.html');
+    res.status(401).json({ error: 'Não autenticado', redirect: '/login.html' });
 }
 
 function checkPlan(requiredPlan) {
@@ -177,7 +146,6 @@ function checkPlan(requiredPlan) {
 // Iniciar login com Google (com parâmetro de plano opcional)
 app.get('/auth/google', (req, res, next) => {
     const plano = req.query.plano;
-    // Salva plano desejado na sessão
     if (plano) {
         req.session.planoDesejado = plano;
     }
@@ -188,50 +156,27 @@ app.get('/auth/google', (req, res, next) => {
 app.get('/auth/google/callback',
     passport.authenticate('google', { failureRedirect: '/login.html?error=true' }),
     (req, res) => {
-        console.log('✅ Callback executado para usuário:', req.user?.email);
-        
-        try {
-            // Cria token JWT
-            const token = jwt.sign(
-                { id: req.user.id, email: req.user.email, plano: req.user.plano },
-                process.env.JWT_SECRET || 'fallback-jwt-secret',
-                { expiresIn: '7d' }
-            );
+        const token = jwt.sign(
+            { id: req.user.id, email: req.user.email, plano: req.user.plano },
+            process.env.JWT_SECRET || 'secret-jwt-padrao-mude-isso',
+            { expiresIn: '7d' }
+        );
 
-            // Salva token em cookie
-            res.cookie('auth_token', token, { 
-                httpOnly: true, 
-                secure: process.env.NODE_ENV === 'production',
-                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-            });
+        res.cookie('auth_token', token, { 
+            httpOnly: true, 
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 7 * 24 * 60 * 60 * 1000
+        });
 
-            // Verifica se tinha plano desejado
-            const planoDesejado = req.session.planoDesejado;
-            delete req.session.planoDesejado;
+        const planoDesejado = req.session.planoDesejado;
+        delete req.session.planoDesejado;
 
-            console.log('🔄 Redirecionando usuário:', {
-                email: req.user.email,
-                plano: req.user.plano,
-                planoDesejado
-            });
-
-            if (planoDesejado === 'profissional') {
-                // Queria plano profissional → vai para upgrade
-                console.log('→ Redirecionando para upgrade');
-                return res.redirect('/upgrade.html');
-            } else if (req.user.plano === 'gratuito') {
-                // Novo usuário gratuito → vai para seleção
-                console.log('→ Redirecionando para seleção (novo usuário)');
-                return res.redirect('/selecao.html?plano=gratuito&novo=true');
-            } else {
-                // Usuário existente → vai para seleção
-                console.log('→ Redirecionando para seleção (usuário existente)');
-                return res.redirect('/selecao.html');
-            }
-        } catch (error) {
-            console.error('❌ Erro no callback:', error);
-            return res.redirect('/login.html?error=callback');
+        if (planoDesejado === 'profissional') {
+            res.redirect('/upgrade.html');
+        } else if (req.user.plano === 'gratuito') {
+            res.redirect('/selecao.html?plano=gratuito&novo=true');
+        } else {
+            res.redirect('/selecao.html');
         }
     }
 );
@@ -245,37 +190,9 @@ app.get('/auth/logout', (req, res) => {
 });
 
 // Verificar status de autenticação
-app.get('/auth/status', async (req, res) => {
-    // Verifica JWT no cookie primeiro
-    const token = req.cookies.auth_token;
-    if (token) {
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-jwt-secret');
-            
-            // Busca dados completos do usuário
-            const result = await pool.query('SELECT * FROM usuarios WHERE id = $1', [decoded.id]);
-            if (result.rows.length > 0) {
-                const user = result.rows[0];
-                return res.json({
-                    autenticado: true,
-                    usuario: {
-                        id: user.id,
-                        nome: user.nome,
-                        email: user.email,
-                        foto: user.foto_url,
-                        plano: user.plano,
-                        status: user.status
-                    }
-                });
-            }
-        } catch (err) {
-            console.log('❌ Token JWT inválido no status:', err.message);
-        }
-    }
-    
-    // Fallback para sessão Passport
-    if (req.isAuthenticated && req.isAuthenticated()) {
-        return res.json({
+app.get('/auth/status', (req, res) => {
+    if (req.isAuthenticated()) {
+        res.json({
             autenticado: true,
             usuario: {
                 id: req.user.id,
@@ -286,21 +203,19 @@ app.get('/auth/status', async (req, res) => {
                 status: req.user.status
             }
         });
+    } else {
+        res.status(401).json({ autenticado: false });
     }
-    
-    res.json({ autenticado: false });
 });
 
 // ==========================================
 // ROTAS DE PAGAMENTO - KIWIFY
 // ==========================================
 
-// Criar checkout Kiwify
 app.post('/api/checkout/kiwify', isAuthenticated, async (req, res) => {
     try {
-        const { plano } = req.body; // 'profissional' ou 'enterprise'
+        const { plano } = req.body;
         
-        // Preços
         const precos = {
             'profissional': 99.90,
             'enterprise': 299.90
@@ -311,7 +226,13 @@ app.post('/api/checkout/kiwify', isAuthenticated, async (req, res) => {
             return res.status(400).json({ error: 'Plano inválido' });
         }
 
-        // Chama API da Kiwify
+        if (!process.env.KIWIFY_API_KEY || !process.env.KIWIFY_PRODUCT_ID) {
+            return res.status(500).json({ 
+                error: 'Gateway de pagamento não configurado',
+                mensagem: 'Entre em contato com o suporte'
+            });
+        }
+
         const response = await axios.post('https://api.kiwify.com.br/v1/checkout', {
             product_id: process.env.KIWIFY_PRODUCT_ID,
             customer_email: req.user.email,
@@ -328,7 +249,6 @@ app.post('/api/checkout/kiwify', isAuthenticated, async (req, res) => {
             }
         });
 
-        // Salva intenção de pagamento
         await pool.query(
             'INSERT INTO pagamentos (usuario_id, plano, valor, gateway, transacao_id, status) VALUES ($1, $2, $3, $4, $5, $6)',
             [req.user.id, plano, valor, 'kiwify', response.data.transaction_id, 'pendente']
@@ -345,26 +265,19 @@ app.post('/api/checkout/kiwify', isAuthenticated, async (req, res) => {
     }
 });
 
-// Webhook Kiwify (confirmação de pagamento)
 app.post('/webhook/kiwify', async (req, res) => {
     try {
         const { event, data } = req.body;
-
-        // Verifica assinatura do webhook
-        const signature = req.headers['x-kiwify-signature'];
-        // TODO: Validar assinatura com KIWIFY_WEBHOOK_SECRET
 
         if (event === 'purchase.approved') {
             const userId = data.metadata.user_id;
             const plano = data.metadata.plano;
 
-            // Atualiza plano do usuário
             await pool.query(
                 'UPDATE usuarios SET plano = $1, status = $2, atualizado_em = NOW() WHERE id = $3',
                 [plano, 'ativo', userId]
             );
 
-            // Atualiza pagamento
             await pool.query(
                 'UPDATE pagamentos SET status = $1, data_pagamento = NOW() WHERE transacao_id = $2',
                 ['aprovado', data.transaction_id]
@@ -382,71 +295,29 @@ app.post('/webhook/kiwify', async (req, res) => {
 });
 
 // ==========================================
-// ROTAS DE PAGAMENTO - PAGBANK (ALTERNATIVA)
+// ROTAS PROTEGIDAS
 // ==========================================
 
-app.post('/api/checkout/pagbank', isAuthenticated, async (req, res) => {
-    try {
-        const { plano } = req.body;
-        
-        const precos = {
-            'profissional': 99.90,
-            'enterprise': 299.90
-        };
-
-        const valor = precos[plano];
-
-        // API do PagBank/PagSeguro
-        const response = await axios.post('https://ws.pagseguro.uol.com.br/v2/checkout', 
-            new URLSearchParams({
-                email: process.env.PAGBANK_EMAIL,
-                token: process.env.PAGBANK_TOKEN,
-                currency: 'BRL',
-                itemId1: '1',
-                itemDescription1: `Plano ${plano}`,
-                itemAmount1: valor.toFixed(2),
-                itemQuantity1: '1',
-                reference: req.user.id,
-                redirectURL: `${process.env.BASE_URL}/pagamento/sucesso`,
-                notificationURL: `${process.env.BASE_URL}/webhook/pagbank`
-            }).toString(),
-            {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            }
-        );
-
-        // Parse XML response (PagBank retorna XML)
-        const checkoutCode = response.data.match(/<code>(.*?)<\/code>/)?.[1];
-
-        if (!checkoutCode) {
-            throw new Error('Código de checkout não recebido');
-        }
-
-        res.json({ 
-            checkout_url: `https://pagseguro.uol.com.br/v2/checkout/payment.html?code=${checkoutCode}` 
-        });
-
-    } catch (error) {
-        console.error('❌ Erro PagBank:', error.response?.data || error.message);
-        res.status(500).json({ error: 'Erro ao criar checkout PagBank' });
-    }
-});
-
-// ==========================================
-// ROTAS PROTEGIDAS (COM CONTROLE DE PLANO)
-// ==========================================
-
-// Nova senha (limitado por plano)
+// Nova senha (CORRIGIDO)
 app.post('/nova-senha', isAuthenticated, async (req, res) => {
     try {
-        console.log('📝 Nova senha - Usuário:', req.user?.email || 'Não identificado');
-        
         const { nome, prioridade, especialidade } = req.body;
         const user = req.user;
 
+        console.log('📋 Tentativa de gerar senha:', { 
+            usuario: user.email, 
+            nome, 
+            especialidade,
+            plano: user.plano 
+        });
+
         // Validações
-        if (!nome || !especialidade) {
-            return res.status(400).json({ error: 'Nome e especialidade obrigatórios' });
+        if (!nome || !nome.trim()) {
+            return res.status(400).json({ error: 'Nome é obrigatório' });
+        }
+        
+        if (!especialidade) {
+            return res.status(400).json({ error: 'Especialidade é obrigatória' });
         }
 
         // Verifica limite do plano gratuito
@@ -456,7 +327,10 @@ app.post('/nova-senha', isAuthenticated, async (req, res) => {
                 [user.id]
             );
 
-            if (parseInt(hoje.rows[0].count) >= 10) {
+            const count = parseInt(hoje.rows[0].count);
+            console.log(`📊 Senhas hoje (usuário ${user.email}): ${count}/10`);
+
+            if (count >= 10) {
                 return res.status(403).json({ 
                     error: 'Limite diário atingido', 
                     mensagem: 'Plano gratuito: máximo 10 senhas por dia. Faça upgrade!' 
@@ -467,42 +341,55 @@ app.post('/nova-senha', isAuthenticated, async (req, res) => {
         const num = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
         const senha = prioridade ? `P${num}` : `N${num}`;
 
+        // CORRIGIDO: Inserir com usuario_id
         const result = await pool.query(
             'INSERT INTO chamadas (usuario_id, paciente_nome, senha, prioridade, status, especialidade, criado_em) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
             [user.id, nome.trim(), senha, !!prioridade, 'aguardando', especialidade]
         );
 
-        console.log(`📋 Senha gerada por ${user.email}: ${senha}`);
+        console.log(`✅ Senha gerada: ${senha} - ${nome} (${especialidade}) por ${user.email}`);
         res.json(result.rows[0]);
 
     } catch (err) {
-        console.error('❌ Erro ao gerar senha:', err);
-        res.status(500).json({ error: 'Erro no servidor: ' + err.message });
+        console.error('❌ Erro ao criar senha:', err);
+        res.status(500).json({ 
+            error: 'Erro no servidor',
+            detalhes: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
     }
 });
 
-// Listar fila (só do usuário autenticado)
+// Listar fila (CORRIGIDO)
 app.get('/pacientes-espera', isAuthenticated, async (req, res) => {
     try {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📋 [FILA] Requisição de:', req.user.email);
+        console.log('📋 [FILA] User ID:', req.user.id);
+        
         const result = await pool.query(
             "SELECT * FROM chamadas WHERE usuario_id = $1 AND status = 'aguardando' ORDER BY prioridade DESC, criado_em ASC",
             [req.user.id]
         );
+        
+        console.log('📋 [FILA] Pacientes encontrados:', result.rows.length);
+        if (result.rows.length > 0) {
+            console.log('📋 [FILA] IDs dos pacientes:', result.rows.map(r => `${r.id} (${r.paciente_nome})`));
+            console.log('📋 [FILA] Usuario_id de cada paciente:', result.rows.map(r => r.usuario_id));
+        }
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
         res.json(result.rows);
     } catch (err) {
-        console.error('❌ Erro:', err);
+        console.error('❌ Erro ao buscar fila:', err);
         res.status(500).json({ error: 'Erro ao buscar fila' });
     }
 });
 
-// Download Excel (limitado por plano)
+// Download Excel
 app.get('/relatorio/download', isAuthenticated, checkPlan('profissional'), async (req, res) => {
     try {
-        const caminhoArquivo = path.join(__dirname, `relatorio_${req.user.id}.csv`);
-        
-        // Gera CSV personalizado do usuário
         const chamadas = await pool.query(
-            'SELECT * FROM chamadas WHERE usuario_id = $1 ORDER BY criado_em DESC',
+            'SELECT * FROM chamadas WHERE usuario_id = $1 ORDER BY criado_em DESC LIMIT 1000',
             [req.user.id]
         );
 
@@ -510,15 +397,17 @@ app.get('/relatorio/download', isAuthenticated, checkPlan('profissional'), async
         chamadas.rows.forEach(c => {
             const data = new Date(c.criado_em).toLocaleDateString('pt-BR');
             const hora = new Date(c.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            csv += `${data};${hora};${c.senha};${c.paciente_nome};${c.especialidade};${c.sala || 'N/A'};${c.status}\n`;
+            csv += `${data};${hora};${c.senha};${c.paciente_nome};${c.especialidade || 'N/A'};${c.sala || 'N/A'};${c.status}\n`;
         });
 
-        fs.writeFileSync(caminhoArquivo, csv, 'utf8');
+        const filename = `relatorio_medicall_${req.user.id}_${new Date().toISOString().split('T')[0]}.csv`;
         
-        res.download(caminhoArquivo, `relatorio_medicall_${new Date().toISOString().split('T')[0]}.csv`);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(csv);
 
     } catch (err) {
-        console.error('❌ Erro:', err);
+        console.error('❌ Erro no download:', err);
         res.status(500).json({ error: 'Erro no download' });
     }
 });
@@ -537,30 +426,94 @@ app.get('/painel.html', isAuthenticated, (req, res) => res.sendFile(path.join(__
 app.get('/upgrade.html', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'public', 'upgrade.html')));
 
 // ==========================================
-// SOCKET.IO
+// SOCKET.IO - ISOLAMENTO TOTAL POR SALA
 // ==========================================
-io.on('connection', (socket) => {
-    console.log('✅ Socket conectado:', socket.id);
 
+io.on('connection', (socket) => {
+    console.log('✅ [SOCKET] Nova conexão:', socket.id);
+    
+    // OBRIGATÓRIO: Cliente deve se identificar para entrar em uma sala
+    socket.on('join_room', async (dados) => {
+        try {
+            const { contexto_id, tipo, email } = dados;
+            
+            if (!contexto_id) {
+                console.error('❌ [JOIN] Contexto_id obrigatório');
+                socket.disconnect();
+                return;
+            }
+            
+            // Define a sala baseada no contexto_id (user_id)
+            const roomId = `room_${contexto_id}`;
+            
+            // Remove de outras salas e entra na sala correta
+            socket.rooms.forEach(room => {
+                if (room !== socket.id) {
+                    socket.leave(room);
+                }
+            });
+            
+            socket.join(roomId);
+            socket.contexto_id = contexto_id;
+            socket.userEmail = email;
+            socket.tipo = tipo;
+            
+            console.log(`🏠 [JOIN] ${tipo} entrou na sala: ${roomId}`);
+            console.log(`👤 [JOIN] Usuário: ${email} (ID: ${contexto_id})`);
+            console.log(`📊 [JOIN] Sockets na sala: ${io.sockets.adapter.rooms.get(roomId)?.size || 0}`);
+            
+            // Confirma entrada na sala
+            socket.emit('room_joined', { roomId, contexto_id });
+            
+        } catch (error) {
+            console.error('❌ [JOIN] Erro:', error);
+            socket.disconnect();
+        }
+    });
+    
+    // EVENTO DE CHAMADA - ISOLADO POR SALA
     socket.on('chamar_paciente', async (dados) => {
         try {
+            if (!socket.contexto_id) {
+                console.error('❌ [CHAMADA] Socket não identificado');
+                return;
+            }
+            
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('📢 [CHAMADA] De:', socket.userEmail, 'Contexto:', socket.contexto_id);
+            console.log('📢 [CHAMADA] Dados:', dados);
+            
             const agora = new Date();
             const horaF = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
+            
+            // Atualiza banco de dados
             await pool.query(
                 'UPDATE chamadas SET status = $1, sala = $2 WHERE id = $3',
                 ['chamado', dados.sala, dados.id]
             );
-
-            io.emit('exibir_painel', { ...dados, hora: horaF });
-            console.log(`📢 Chamado: ${dados.senha} → ${dados.sala}`);
-
+            
+            // ENVIA APENAS PARA A SALA ESPECÍFICA
+            const roomId = `room_${socket.contexto_id}`;
+            const payload = { ...dados, hora: horaF };
+            
+            console.log(`📤 [EMIT] EXCLUSIVO para sala: ${roomId}`);
+            console.log(`📤 [EMIT] Payload:`, payload);
+            console.log(`📊 [EMIT] Sockets na sala: ${io.sockets.adapter.rooms.get(roomId)?.size || 0}`);
+            
+            // CRÍTICO: Emite APENAS para a sala específica
+            io.to(roomId).emit('exibir_painel', payload);
+            
+            console.log(`✅ [SUCESSO] Enviado para sala ${roomId}: ${dados.senha} → ${dados.sala}`);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
         } catch (err) {
-            console.error('❌ Erro:', err);
+            console.error('❌ [ERRO] Chamada:', err);
         }
     });
-
-    socket.on('disconnect', () => console.log('❌ Socket desconectado'));
+    
+    socket.on('disconnect', () => {
+        console.log(`❌ [DISCONNECT] ${socket.userEmail || 'N/A'} (${socket.contexto_id || 'N/A'})`);
+    });
 });
 
 // ==========================================
@@ -569,7 +522,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🏥  SISTEMA DE CHAMADAS - v2.0 (OAuth)');
+    console.log('🏥  SISTEMA DE CHAMADAS - v2.1 (CORRIGIDO)');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`🚀 Servidor: http://localhost:${PORT}`);
     console.log(`🌍 Ambiente: ${process.env.NODE_ENV || 'development'}`);

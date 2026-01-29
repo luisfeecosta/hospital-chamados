@@ -21,12 +21,31 @@
         @keyframes fadeInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
         .blink { animation: blinker 1s linear infinite; }
         @keyframes blinker { 50% { opacity: 0.5; } }
+        
+        .debug-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
 
 <div class="relogio" id="relogioReal">00:00:00</div>
 <button id="ativarAudio" style="position: absolute; top: 20px; right: 20px; padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">🔊 Ativar Áudio</button>
+
+<!-- Debug Info (remover em produção) -->
+<div class="debug-info">
+    <div>🆔 User ID: <span id="debugUserId">-</span></div>
+    <div>📧 Email: <span id="debugEmail">-</span></div>
+    <div>🔌 Socket: <span id="debugSocketId">-</span></div>
+    <div>🏠 Room: <span id="debugRoom">-</span></div>
+</div>
 
 <div class="container-fluid">
     <div class="row">
@@ -50,8 +69,121 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    const socket = io();
+    // Verifica autenticação ao carregar a página
+    async function verificarAuth() {
+        try {
+            const response = await fetch('/auth/status', {
+                credentials: 'include'
+            });
+            
+            if (!response.ok || response.status === 401) {
+                window.location.href = '/login.html';
+                return null;
+            }
+            
+            const data = await response.json();
+            if (!data.autenticado) {
+                window.location.href = '/login.html';
+                return null;
+            }
+            
+            console.log('✅ [PAINEL] Autenticado:', data.usuario.email, 'ID:', data.usuario.id);
+            
+            // Atualiza debug info
+            document.getElementById('debugUserId').textContent = data.usuario.id;
+            document.getElementById('debugEmail').textContent = data.usuario.email;
+            
+            return data.usuario;
+        } catch (error) {
+            console.error('Erro ao verificar autenticação:', error);
+            window.location.href = '/login.html';
+            return null;
+        }
+    }
+    
+    // Verifica autenticação antes de conectar ao socket
+    verificarAuth().then(usuario => {
+        if (!usuario) return;
+        
+        // Só conecta ao socket após autenticação confirmada
+        iniciarPainel(usuario);
+    });
+    
+    let socket;
     let historico = [];
+    let meuUserId = null;
+
+    function iniciarPainel(usuario) {
+        meuUserId = usuario.id;
+        
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('🏥 [PAINEL] Inicializando para usuário:', usuario.email);
+        console.log('🆔 [PAINEL] User ID:', meuUserId);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        socket = io();
+        
+        socket.on('connect', () => {
+            console.log('✅ [PAINEL] Socket conectado:', socket.id);
+            
+            // Atualiza debug info
+            document.getElementById('debugSocketId').textContent = socket.id;
+            document.getElementById('debugRoom').textContent = `room_${meuUserId}`;
+            
+            // CRÍTICO: Entra na sala IMEDIATAMENTE após conectar
+            const dadosJoin = {
+                contexto_id: meuUserId,
+                tipo: 'painel',
+                email: usuario.email
+            };
+            
+            console.log('📤 [PAINEL] Enviando join_room:', dadosJoin);
+            socket.emit('join_room', dadosJoin);
+        });
+        
+        // Confirmação de entrada na sala
+        socket.on('room_joined', (dados) => {
+            console.log('✅ [PAINEL] Entrou na sala:', dados.roomId);
+            console.log('✅ [PAINEL] Contexto confirmado:', dados.contexto_id);
+            console.log('🚨 [DEBUG] Se não aparecer este log, o servidor não está respondendo!');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('❌ [PAINEL] Socket desconectado');
+            document.getElementById('debugSocketId').textContent = 'desconectado';
+        });
+        
+        // EVENTO PRINCIPAL - Recebe chamadas APENAS da sua sala
+        socket.on('exibir_painel', (dados) => {
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('📺 [PAINEL] CHAMADA RECEBIDA!');
+            console.log('📺 [PAINEL] Meu User ID:', meuUserId);
+            console.log('📺 [PAINEL] Dados recebidos:', dados);
+            console.log('📺 [PAINEL] Socket ID:', socket.id);
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            // Atualiza interface
+            const nomeEl = document.getElementById('mainNome');
+            const horaChamada = dados.hora || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+            nomeEl.innerText = dados.nome;
+            document.getElementById('mainEspecialidade').innerText = dados.especialidade || "Atendimento";
+            document.getElementById('mainSenha').innerText = dados.senha;
+            document.getElementById('mainSala').innerText = dados.sala;
+            document.getElementById('mainHora').innerText = "Chamado às " + horaChamada;
+
+            // Efeito visual
+            nomeEl.classList.add('blink');
+            setTimeout(() => nomeEl.classList.remove('blink'), 5000);
+
+            // Áudio
+            reproduzirAudio(dados);
+
+            // Histórico
+            dados.hora = horaChamada;
+            atualizarHistorico(dados);
+        });
+    }
 
     // Relógio Digital
     setInterval(() => {
@@ -68,29 +200,6 @@
         // Remove o botão após ativar
         this.style.display = 'none';
         console.log('Áudio ativado pelo usuário');
-    });
-
-    socket.on('exibir_painel', (dados) => {
-        // 1. Atualiza Elementos da Tela
-        const nomeEl = document.getElementById('mainNome');
-        const horaChamada = dados.hora || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-        nomeEl.innerText = dados.nome;
-        document.getElementById('mainEspecialidade').innerText = dados.especialidade || "Atendimento";
-        document.getElementById('mainSenha').innerText = dados.senha;
-        document.getElementById('mainSala').innerText = dados.sala;
-        document.getElementById('mainHora').innerText = "Chamado às " + horaChamada;
-
-        // 2. Efeito de Destaque
-        nomeEl.classList.add('blink');
-        setTimeout(() => nomeEl.classList.remove('blink'), 5000);
-
-        // 3. Sistema de Voz
-        reproduzirAudio(dados);
-
-        // 4. Atualiza Histórico
-        dados.hora = horaChamada;
-        atualizarHistorico(dados);
     });
 
     // Função para reproduzir áudio
